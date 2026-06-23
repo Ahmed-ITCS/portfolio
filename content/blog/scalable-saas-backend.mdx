@@ -1,0 +1,69 @@
+---
+title: "Building a Scalable Multi-Tenant SaaS Backend"
+description: "A deep-dive into architecting a modular, feature-based backend that supports 10,000+ concurrent sessions with sub-150ms latency."
+date: "2026-03-15"
+tags: ["System Design", "SaaS", "Python", "PostgreSQL"]
+readingTime: "8 min read"
+---
+
+## The Challenge
+
+When building a Voice AI SaaS platform, the backend must handle real-time communication, call scheduling, transcription storage, and AI intent parsing — all while maintaining sub-150ms response times across thousands of concurrent sessions.
+
+## Architecture Decisions
+
+### Feature-Based Modular Design
+
+Instead of a monolithic structure, I decomposed the system into 7+ interconnected modules, each owning a specific domain:
+
+- **Communication** — Real-time messaging and call state management
+- **Scheduling** — Calendar integration and availability logic
+- **Transcription** — Audio processing and storage pipelines
+- **Intent Parsing** — LLM-powered conversation understanding
+- **Authentication** — JWT + OAuth with role-based access
+
+Each module exposes a well-defined API contract, enabling independent scaling and deployment.
+
+### Database Optimization
+
+PostgreSQL schema design was critical. Key optimizations included:
+
+1. **Composite indexes** on frequently queried multi-tenant columns
+2. **Connection pooling** with PgBouncer for session management
+3. **Query plan analysis** that reduced overhead by 45%
+
+```python
+# Example: tenant-scoped query with optimized index
+sessions = (
+    Session.objects
+    .filter(tenant_id=tenant_id, status="active")
+    .select_related("user", "call_config")
+    .only("id", "started_at", "user__email")
+)
+```
+
+## Security First
+
+Security wasn't an afterthought. We implemented:
+
+- Input sanitization at every API boundary
+- JWT with short-lived tokens and refresh rotation
+- OAuth 2.0 for third-party integrations
+- Independent penetration testing that eliminated 95%+ of exploit vectors
+
+## Results
+
+- **API latency (p95):** 380ms → under 150ms
+- **Concurrent sessions:** 2,000 → 10,000+
+- **Integration bugs:** reduced by 70%
+- **Query overhead:** reduced by 45%
+
+## Key Takeaways
+
+1. **API contracts are contracts** — Invest in rigid schemas early; it pays off when frontend, AI, and backend teams integrate.
+2. **Measure before optimizing** — Query plan analysis revealed bottlenecks that weren't obvious from application logs.
+3. **Modular doesn't mean microservices** — A well-structured monolith with clear module boundaries often outperforms premature service extraction.
+
+---
+
+*Building in public — follow my journey on [LinkedIn](https://linkedin.com/in/ahmed-k-b44781128).*

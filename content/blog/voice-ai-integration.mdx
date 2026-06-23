@@ -1,0 +1,74 @@
+---
+title: "Integrating Voice AI: Lessons from Production"
+description: "Practical patterns for integrating Twilio Voice AI and OpenAI into a production SaaS backend with secure webhooks and reliable orchestration."
+date: "2026-05-20"
+tags: ["Voice AI", "Twilio", "OpenAI", "Webhooks"]
+readingTime: "6 min read"
+---
+
+## Why Voice AI Integration Is Hard
+
+Voice AI isn't just another API call. You're dealing with real-time audio streams, webhook callbacks from multiple providers, state machines for call lifecycle, and LLM inference latency — all simultaneously.
+
+## The Integration Stack
+
+Our production stack combined:
+
+- **Twilio** for telephony and voice streaming
+- **OpenAI** for intent parsing and conversation intelligence
+- **FastAPI** for high-throughput webhook handlers
+- **Django** for business logic and persistence
+
+## Webhook Architecture
+
+The critical insight: **treat webhooks as first-class citizens**, not side effects.
+
+```python
+@router.post("/webhooks/twilio/voice")
+async def handle_voice_webhook(request: Request):
+    payload = await validate_twilio_signature(request)
+    call_state = await call_service.get_state(payload.call_sid)
+
+    match call_state.status:
+        case "ringing":
+            await scheduler.queue_intent_analysis(payload)
+        case "in-progress":
+            await transcription.store_chunk(payload)
+        case "completed":
+            await analytics.finalize_session(payload.call_sid)
+
+    return Response(status_code=200)
+```
+
+### Key Patterns
+
+1. **Idempotent handlers** — Webhooks retry; design for duplicate delivery
+2. **Signature validation** — Never process unverified payloads
+3. **Async decoupling** — Acknowledge fast, process in background queues
+4. **State machines** — Explicit call lifecycle prevents race conditions
+
+## Handling 5+ External Services
+
+With Twilio, OpenAI, and auxiliary services, failure modes multiply:
+
+- Implement circuit breakers for external API calls
+- Use dead-letter queues for failed webhook processing
+- Log correlation IDs across service boundaries
+- Monitor webhook delivery latency, not just API response times
+
+## Production Metrics That Matter
+
+Don't just track uptime. Monitor:
+
+- **Webhook processing time** (p50, p95, p99)
+- **Call setup latency** (ring to first AI response)
+- **Transcription accuracy pipeline delay**
+- **Failed webhook retry rate**
+
+## Closing Thoughts
+
+Voice AI integration rewards engineers who think in systems, not endpoints. The webhook layer is where most production issues surface — invest there first.
+
+---
+
+*Questions about Voice AI architecture? [Get in touch](/blog#contact).*
